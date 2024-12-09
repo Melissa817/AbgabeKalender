@@ -84,7 +84,6 @@ fun AddScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-
             OutlinedTextField(
                 value = if (arrivalDate != null && departureDate != null) {
                     "${arrivalDate!!.format(dateFormatter)} - ${departureDate!!.format(dateFormatter)}"
@@ -161,39 +160,48 @@ fun DateRangePickerModal(
 ) {
     val context = LocalContext.current
     val calendar = Calendar.getInstance()
+
     var startDate by remember { mutableStateOf<LocalDate?>(null) }
     var endDate by remember { mutableStateOf<LocalDate?>(null) }
 
+    val dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
+
+    // DatePickerDialog for start date
     if (startDate == null) {
         DatePickerDialog(
             context,
             { _, year, month, dayOfMonth ->
-                startDate = LocalDate.of(year, month + 1, dayOfMonth)
+                val selectedStartDate = LocalDate.of(year, month + 1, dayOfMonth)
+                startDate = selectedStartDate
+
+                // Once start date is selected, show the end date picker
+                val startDateMillis = Calendar.getInstance().apply {
+                    set(startDate!!.year, startDate!!.monthValue - 1, startDate!!.dayOfMonth)
+                }.timeInMillis
+
+                val endDatePicker = DatePickerDialog(
+                    context,
+                    { _, endYear, endMonth, endDayOfMonth ->
+                        val selectedEndDate = LocalDate.of(endYear, endMonth + 1, endDayOfMonth)
+                        if (selectedEndDate.isAfter(startDate!!)) {
+                            endDate = selectedEndDate
+                            onDateSelected(startDate!!, endDate!!)
+                            onDismiss() // Close the dialog after selecting both dates
+                        } else {
+                            // Optional: Show validation message for invalid end date
+                        }
+                    },
+                    calendar.get(Calendar.YEAR),
+                    calendar.get(Calendar.MONTH),
+                    calendar.get(Calendar.DAY_OF_MONTH)
+                )
+                // Set minimum date for the end date picker
+                endDatePicker.datePicker.minDate = startDateMillis
+                endDatePicker.show()
             },
             calendar.get(Calendar.YEAR),
             calendar.get(Calendar.MONTH),
             calendar.get(Calendar.DAY_OF_MONTH)
         ).show()
-    } else if (endDate == null) {
-        val startDateMillis = Calendar.getInstance().apply {
-            set(startDate!!.year, startDate!!.monthValue - 1, startDate!!.dayOfMonth)
-        }.timeInMillis
-
-        val endDatePicker = DatePickerDialog(
-            context,
-            { _, year, month, dayOfMonth ->
-                endDate = LocalDate.of(year, month + 1, dayOfMonth)
-                if (startDate != null && endDate != null) {
-                    onDateSelected(startDate!!, endDate!!)
-                }
-                onDismiss()
-            },
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH)
-        )
-
-        endDatePicker.datePicker.minDate = startDateMillis
-        endDatePicker.show()
     }
 }
