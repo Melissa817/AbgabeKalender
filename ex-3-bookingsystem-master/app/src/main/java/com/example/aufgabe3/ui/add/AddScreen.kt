@@ -1,48 +1,48 @@
 package com.example.aufgabe3.ui.add
 
-import android.app.DatePickerDialog
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.IconButton
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material3.Icon
+import androidx.compose.material3.rememberDateRangePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
-import com.example.aufgabe3.viewmodel.SharedViewModel
 import com.example.aufgabe3.model.BookingEntry
+import com.example.aufgabe3.viewmodel.SharedViewModel
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
-import java.util.*
+import androidx.compose.material3.*
+import androidx.compose.ui.Alignment
+
 
 /**
- * AddScreen is the screen for adding a new booking entry.
- * This composable provides a form for entering the name, arrival date, and departure date of a booking.
- * A date range picker dialog allows users to select the booking dates. It also includes a "Save" button
- * to save the booking and a back navigation button.
- * @param navController The navigation controller used for navigating between screens.
- * @param sharedViewModel The shared view model used for managing the list of booking entries.
+ * Composable for the Add Screen, allowing users to add a new booking entry.
+ * @param navController The NavHostController for navigation between screens.
+ * @param sharedViewModel The SharedViewModel to manage booking entries.
  */
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddScreen(
@@ -74,7 +74,6 @@ fun AddScreen(
                 .padding(innerPadding)
                 .padding(16.dp)
         ) {
-
             OutlinedTextField(
                 value = name,
                 onValueChange = { name = it },
@@ -99,12 +98,7 @@ fun AddScreen(
                     .clickable { showDateRangePicker = true },
                 colors = OutlinedTextFieldDefaults.colors(
                     disabledTextColor = MaterialTheme.colorScheme.onSurface,
-                    disabledBorderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledTrailingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledLabelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    disabledSupportingTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    disabledBorderColor = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             )
 
@@ -126,7 +120,7 @@ fun AddScreen(
                         sharedViewModel.addBookingEntry(BookingEntry(arrivalDate!!, departureDate!!, name))
                         navController.popBackStack()
                     } else {
-                        errorMessage = "Please fill all the fields!"
+                        errorMessage = "Please fill out all the fields!"
                     }
                 },
                 modifier = Modifier.fillMaxWidth()
@@ -138,70 +132,73 @@ fun AddScreen(
 
     if (showDateRangePicker) {
         DateRangePickerModal(
-            onDismiss = { showDateRangePicker = false },
-            onDateSelected = { startDate, endDate ->
-                arrivalDate = startDate
-                departureDate = endDate
+            onDateRangeSelected = { dateRange ->
+                dateRange.first?.let { startMillis ->
+                    dateRange.second?.let { endMillis ->
+                        arrivalDate = Instant.ofEpochMilli(startMillis)
+                            .atZone(ZoneId.systemDefault())
+                            .toLocalDate()
+                        departureDate = Instant.ofEpochMilli(endMillis)
+                            .atZone(ZoneId.systemDefault())
+                            .toLocalDate()
+                    }
+                }
                 showDateRangePicker = false
-            }
+            },
+            onDismiss = { showDateRangePicker = false }
         )
     }
 }
+
 /**
- * DateRangePickerModal is a custom dialog for selecting a date range.
- * It allows selecting a start and end date, with the end date restricted to be after or equal to the start date.
- * @param onDismiss The callback when the dialog is dismissed.
- * @param onDateSelected The callback with the selected start and end dates.
+ * A modal dialog for selecting a date range.
+ * @param onDateRangeSelected Callback invoked when a date range is selected.
+ * The Pair contains the start and end dates in milliseconds since epoch.
+ * @param onDismiss Callback invoked when the dialog is dismissed.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DateRangePickerModal(
-    onDismiss: () -> Unit,
-    onDateSelected: (LocalDate, LocalDate) -> Unit
+    onDateRangeSelected: (Pair<Long?, Long?>) -> Unit,
+    onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
-    val calendar = Calendar.getInstance()
+    val dateRangePickerState = rememberDateRangePickerState()
 
-    var startDate by remember { mutableStateOf<LocalDate?>(null) }
-    var endDate by remember { mutableStateOf<LocalDate?>(null) }
-
-    val dateFormatter = DateTimeFormatter.ofPattern("dd.MM.yyyy")
-
-    // DatePickerDialog for start date
-    if (startDate == null) {
-        DatePickerDialog(
-            context,
-            { _, year, month, dayOfMonth ->
-                val selectedStartDate = LocalDate.of(year, month + 1, dayOfMonth)
-                startDate = selectedStartDate
-
-                // Once start date is selected, show the end date picker
-                val startDateMillis = Calendar.getInstance().apply {
-                    set(startDate!!.year, startDate!!.monthValue - 1, startDate!!.dayOfMonth)
-                }.timeInMillis
-
-                val endDatePicker = DatePickerDialog(
-                    context,
-                    { _, endYear, endMonth, endDayOfMonth ->
-                        val selectedEndDate = LocalDate.of(endYear, endMonth + 1, endDayOfMonth)
-                        if (selectedEndDate.isAfter(startDate!!)) {
-                            endDate = selectedEndDate
-                            onDateSelected(startDate!!, endDate!!)
-                            onDismiss() // Close the dialog after selecting both dates
-                        } else {
-                            // Optional: Show validation message for invalid end date
-                        }
-                    },
-                    calendar.get(Calendar.YEAR),
-                    calendar.get(Calendar.MONTH),
-                    calendar.get(Calendar.DAY_OF_MONTH)
-                )
-                // Set minimum date for the end date picker
-                endDatePicker.datePicker.minDate = startDateMillis
-                endDatePicker.show()
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    onDateRangeSelected(
+                        Pair(
+                            dateRangePickerState.selectedStartDateMillis,
+                            dateRangePickerState.selectedEndDateMillis
+                        )
+                    )
+                    onDismiss()
+                }
+            ) {
+                Text("OK")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    ) {
+        DateRangePicker(
+            state = dateRangePickerState,
+            title = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(text = "Select Date Range")
+                }
             },
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH),
-            calendar.get(Calendar.DAY_OF_MONTH)
-        ).show()
+            showModeToggle = false,
+            modifier = Modifier.fillMaxWidth().height(300.dp)
+        )
     }
 }
