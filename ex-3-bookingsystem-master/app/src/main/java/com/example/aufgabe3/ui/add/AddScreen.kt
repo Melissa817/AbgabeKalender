@@ -1,5 +1,7 @@
 package com.example.aufgabe3.ui.add
 
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -95,7 +97,9 @@ fun AddScreen(
                 readOnly = true,
                 modifier = Modifier
                     .fillMaxWidth()
+                    .align(Alignment.CenterHorizontally)
                     .clickable { showDateRangePicker = true },
+
                 colors = OutlinedTextFieldDefaults.colors(
                     disabledTextColor = MaterialTheme.colorScheme.onSurface,
                     disabledBorderColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -154,6 +158,8 @@ fun AddScreen(
  * A modal dialog for selecting a date range.
  * @param onDateRangeSelected Callback invoked when a date range is selected.
  * The Pair contains the start and end dates in milliseconds since epoch.
+ * @param onDateRangeSelected.selectedStartDateMillis The start date in milliseconds since epoch. Can be null if no start date is selected.
+ * @param onDateRangeSelected.selectedEndDateMillis The end date in milliseconds since epoch. Can be null if no end date is selected.
  * @param onDismiss Callback invoked when the dialog is dismissed.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -162,6 +168,7 @@ fun DateRangePickerModal(
     onDateRangeSelected: (Pair<Long?, Long?>) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     val dateRangePickerState = rememberDateRangePickerState()
 
     DatePickerDialog(
@@ -169,12 +176,20 @@ fun DateRangePickerModal(
         confirmButton = {
             TextButton(
                 onClick = {
-                    onDateRangeSelected(
-                        Pair(
-                            dateRangePickerState.selectedStartDateMillis,
-                            dateRangePickerState.selectedEndDateMillis
-                        )
-                    )
+                    val todayMillis = System.currentTimeMillis()-86400000
+                    val selectedStartDateMillis = dateRangePickerState.selectedStartDateMillis
+                    val selectedEndDateMillis = dateRangePickerState.selectedEndDateMillis
+
+                    if (selectedStartDateMillis != null && selectedStartDateMillis < todayMillis) {
+                        Toast.makeText(context, "The start date cannot be before today!", Toast.LENGTH_SHORT).show()
+                        return@TextButton
+                    }
+                    if (selectedEndDateMillis != null && selectedEndDateMillis < todayMillis) {
+                        Toast.makeText(context, "The end date cannot be before today!", Toast.LENGTH_SHORT).show()
+                        return@TextButton
+                    }
+
+                    onDateRangeSelected(Pair(selectedStartDateMillis, selectedEndDateMillis))
                     onDismiss()
                 }
             ) {
@@ -190,15 +205,14 @@ fun DateRangePickerModal(
         DateRangePicker(
             state = dateRangePickerState,
             title = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(text = "Select Date Range")
-                }
+                Text(
+                    text = "Select date range"
+                )
             },
             showModeToggle = false,
-            modifier = Modifier.fillMaxWidth().height(300.dp)
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(500.dp)
         )
     }
 }
